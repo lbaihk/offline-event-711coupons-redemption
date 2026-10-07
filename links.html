@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>領取連結產生器｜LongbridgeAI</title>
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="light">
+<link rel="icon" href="assets/lbai-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --green: #00DBB6; --green-35: #A8F2E4; --black: #000; --white: #fff; --mute: #535353; --hairline: #E5E5E5; --surface: #F6F6F6;
+          --font: "Cera Pro", "DM Sans", "Noto Sans TC", "PingFang HK", "Helvetica Neue", Arial, sans-serif; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--white); color: var(--black); line-height: 1.55; }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 20px 16px 48px; }
+  [hidden] { display: none !important; }
+  header img { height: 26px; display: block; margin-bottom: 20px; }
+  h1 { font-size: 22px; margin-bottom: 6px; }
+  .lead { color: var(--mute); font-size: 14px; margin-bottom: 20px; }
+  .card { border: 1px solid var(--hairline); border-radius: 16px; padding: 20px; }
+  label { display: block; font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .hint { font-size: 12px; color: var(--mute); margin-top: 4px; }
+  .field { margin-bottom: 16px; }
+  input { font: inherit; font-size: 16px; border: 1px solid #CFCFCF; border-radius: 10px; height: 48px; padding: 0 14px; width: 100%; outline: none; }
+  input:focus { border-color: var(--black); box-shadow: 0 0 0 3px var(--green-35); }
+  .out { margin-top: 20px; text-align: center; }
+  .url { font-size: 13px; background: var(--surface); border-radius: 10px; padding: 10px 12px; word-break: break-all; text-align: left; margin-bottom: 16px; }
+  #qr { width: 220px; height: 220px; margin: 0 auto 16px; }
+  #qr img, #qr canvas { width: 220px !important; height: 220px !important; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn { height: 48px; border-radius: 12px; border: 0; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .btn-black { background: var(--black); color: var(--white); }
+  .btn-green { background: var(--green); color: var(--black); }
+  .warn { margin-top: 16px; font-size: 12px; color: var(--mute); text-align: left; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><img src="assets/lbai-logo.png" alt="LongbridgeAI"></header>
+  <h1>領取連結產生器</h1>
+  <p class="lead">填寫活動名稱及你的 Bee 名稱，即可取得專屬領取連結及 QR code。客人經此連結領取，記錄會自動標示活動及 Bee。</p>
+
+  <div class="card">
+    <div class="field">
+      <label for="event">活動名稱</label>
+      <input id="event" maxlength="50" placeholder="例如 mostown" autocomplete="off">
+      <p class="hint">建議用英文或數字，同一活動請所有 Bee 用相同寫法，方便統計</p>
+    </div>
+    <div class="field">
+      <label for="bee">Bee 名稱</label>
+      <input id="bee" maxlength="50" placeholder="例如 Vivian" autocomplete="off">
+    </div>
+
+    <div class="out" id="out" hidden>
+      <div class="url" id="url"></div>
+      <div id="qr"></div>
+      <div class="actions">
+        <button class="btn btn-black" id="copy" type="button">複製連結</button>
+        <button class="btn btn-green" id="download" type="button">下載 QR code</button>
+      </div>
+      <p class="warn">此頁面只產生連結，不會派發電子現金券。請勿在領取頁面提交資料作測試，否則會用掉真實的券。</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  // 領取頁面＝同一個資料夾嘅 index.html
+  const CLAIM_PAGE = new URL('./', location.href).href;
+  const $ = id => document.getElementById(id);
+  let current = '';
+
+  function build() {
+    const event = $('event').value.trim();
+    const bee = $('bee').value.trim();
+    if (!event && !bee) { $('out').hidden = true; return; }
+    const q = new URLSearchParams();
+    if (event) q.set('event', event);
+    if (bee) q.set('bee', bee);
+    current = CLAIM_PAGE + '?' + q.toString();
+    $('url').textContent = current;
+    $('qr').replaceChildren();
+    if (window.QRCode) new QRCode($('qr'), { text: current, width: 440, height: 440, correctLevel: QRCode.CorrectLevel.M });
+    $('out').hidden = false;
+  }
+
+  $('event').addEventListener('input', build);
+  $('bee').addEventListener('input', build);
+
+  $('copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(current); } catch (_) { prompt('複製以下連結：', current); return; }
+    $('copy').textContent = '已複製 ✓';
+    setTimeout(() => { $('copy').textContent = '複製連結'; }, 1800);
+  });
+
+  $('download').addEventListener('click', () => {
+    const canvas = $('qr').querySelector('canvas');
+    const src = canvas ? canvas.toDataURL('image/png') : ($('qr').querySelector('img') || {}).src;
+    if (!src) return;
+    const a = document.createElement('a');
+    const safe = s => s.trim().replace(/[^\w一-鿿-]+/g, '_');
+    a.download = ['7eleven', safe($('event').value), safe($('bee').value)].filter(Boolean).join('_') + '.png';
+    a.href = src;
+    a.click();
+  });
+</script>
+</body>
+</html>
