@@ -80,6 +80,15 @@
 
   .dl-btn { margin-top: 16px; }
   .dl-note { font-size: 12px; color: var(--mute); text-align: center; margin-top: 8px; }
+  .btn-ghost { background: var(--white); color: var(--black); border: 1px solid var(--black); }
+  .transfer-btn { margin-top: 12px; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; padding: 16px; z-index: 10; }
+  .modal-card { background: var(--white); border-radius: 16px; padding: 24px 20px; width: 100%; max-width: 360px; text-align: center; }
+  .modal-title { font-size: 18px; font-weight: 700; }
+  .modal-sub { font-size: 13px; color: var(--mute); margin: 6px 0 16px; }
+  .transfer-qr { width: 220px; height: 220px; margin: 0 auto; }
+  .transfer-qr img, .transfer-qr canvas { width: 220px !important; height: 220px !important; display: block; image-rendering: pixelated; }
+  .modal-warn { font-size: 13px; color: #C94100; margin: 14px 0 16px; }
   section.info { margin-top: 28px; }
   section.info h3 { font-size: 15px; font-weight: 700; margin: 18px 0 6px; }
   section.info p { font-size: 14px; }
@@ -158,6 +167,17 @@
     </div>
     <button class="btn btn-primary dl-btn" id="download" type="button">下載電子現金券（儲存到相簿）</button>
     <p class="dl-note" id="dlNote">圖片已包括 QR code、號碼及條款及細則。</p>
+    <button class="btn btn-ghost transfer-btn" id="transferBtn" type="button">轉到客人手機（顯示轉移 QR code）</button>
+
+    <div class="modal" id="transferModal" hidden role="dialog" aria-modal="true" aria-labelledby="transferTitle">
+      <div class="modal-card">
+        <p class="modal-title" id="transferTitle">請客人用手機相機掃描</p>
+        <p class="modal-sub">客人手機會打開同一張電子現金券，可再按「下載」儲存到相簿。</p>
+        <div class="transfer-qr" id="transferQr"></div>
+        <p class="modal-warn">此 QR code 只用於轉移，<b>不可</b>在 7-Eleven 使用</p>
+        <button class="btn btn-primary" id="transferClose" type="button">完成，關閉</button>
+      </div>
+    </div>
   </section>
 
   <section class="info">
@@ -277,7 +297,8 @@
     $('vCode').textContent = code.replace(/(\d{4})(?=\d)/g, '$1 ');
     $('vDemo').hidden = !v.demoText;
     $('vExpiry').textContent = v.expiry ? '有效日期至 Expiring on ' + v.expiry : '';
-    $('vMeta').textContent = maskEmail(v.email) + (v.claimedAt ? ' · 領取時間 ' + v.claimedAt : '');
+    $('vMeta').textContent = [v.email ? maskEmail(v.email) : '', v.claimedAt ? '領取時間 ' + v.claimedAt : ''].filter(Boolean).join(' · ');
+    $('vMeta').hidden = !$('vMeta').textContent;
     $('formView').hidden = true;
     $('voucherView').hidden = false;
     window.scrollTo({ top: 0 });
@@ -440,6 +461,28 @@
       btn.disabled = false; btn.textContent = '下載電子現金券（儲存到相簿）';
     }
   });
+
+  // ===== 轉到客人手機：轉移 QR code 只喺彈出視窗顯示，避免收銀員掃錯 =====
+  $('transferBtn').addEventListener('click', () => {
+    if (!current) return;
+    const link = new URL(location.pathname, location.origin);
+    link.searchParams.set('v', current.code || current.demoText || '');
+    if (current.expiry) link.searchParams.set('x', current.expiry);
+    if (current.demoText) link.searchParams.set('demo', '1');
+    $('transferQr').replaceChildren();
+    if (window.QRCode) new QRCode($('transferQr'), { text: link.href, width: 440, height: 440, correctLevel: QRCode.CorrectLevel.M });
+    $('transferModal').hidden = false;
+  });
+  $('transferClose').addEventListener('click', () => { $('transferModal').hidden = true; $('transferQr').replaceChildren(); });
+
+  // 客人掃咗轉移 QR code：直接顯示嗰張券，並記住喺客人手機
+  const URL_VOUCHER = (params.get('v') || '').replace(/\D/g, '');
+  if (URL_VOUCHER.length >= 8) {
+    const v = params.get('demo') ? { demoText: URL_VOUCHER } : { code: URL_VOUCHER };
+    v.expiry = (params.get('x') || '').slice(0, 10);
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (_) {}
+    history.replaceState(null, '', location.pathname);   // 網址列唔再顯示號碼
+  }
 
   // 同一部手機再打開：直接顯示電子現金券（付款時需要打開此頁面）
   try {
