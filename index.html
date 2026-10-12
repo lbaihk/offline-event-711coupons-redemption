@@ -53,6 +53,8 @@
   .field.invalid .err { display: block; }
   .track-chip { display: inline-block; font-size: 15px; font-weight: 700; background: var(--lbai-green-35); padding: 6px 14px; border-radius: 999px; }
   .chips { display: flex; gap: 16px; flex-wrap: wrap; }
+  .opt { font-weight: 400; color: var(--mute); font-size: 12px; }
+  .contact-err { color: #C94100; font-size: 13px; margin: -8px 0 12px; }
   .consent { font-size: 12px; color: var(--mute); margin: 4px 0 16px; }
 
   .btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 52px; border-radius: 12px; border: 0; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
@@ -113,7 +115,7 @@
       </div>
       <div class="partner" data-partner-logo></div>
     </div>
-    <p class="lead">輸入 LongbridgeAI 用戶 ID、電郵地址及手機號碼，即可領取 7-Eleven $10 電子現金券。</p>
+    <p class="lead">輸入 LongbridgeAI 用戶 ID，以及電郵地址或手機號碼（二選一），即可領取 7-Eleven $10 電子現金券。</p>
     <form class="card" id="form" novalidate>
       <div class="field" id="fUser">
         <label for="userId">LongbridgeAI 用戶 ID</label>
@@ -121,19 +123,19 @@
         <div class="err">用戶 ID 只可包含數字</div>
       </div>
       <div class="field" id="fEmail">
-        <label for="email">電郵地址</label>
-        <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="name@example.com" required>
+        <label for="email">電郵地址 <span class="opt">（電郵或手機號碼二選一）</span></label>
+        <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="name@example.com">
         <div class="err">請輸入有效的電郵地址</div>
       </div>
       <div class="field" id="fPhone">
-        <label for="phone">手機號碼</label>
+        <label for="phone">手機號碼 <span class="opt">（電郵或手機號碼二選一）</span></label>
         <div class="phone">
           <select id="cc" aria-label="國家／地區區號">
             <option value="+852" selected>🇭🇰 +852</option>
             <option value="+853">🇲🇴 +853</option>
             <option value="+86">🇨🇳 +86</option>
           </select>
-          <input id="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="9123 4567" required>
+          <input id="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="9123 4567">
         </div>
         <div class="err">請輸入有效的手機號碼</div>
       </div>
@@ -143,7 +145,8 @@
           <div id="cBee" hidden><label>Bee</label><div class="track-chip" id="vBee"></div></div>
         </div>
       </div>
-      <p class="consent">每位用戶只可領取一張：用戶 ID、電郵地址及手機號碼任何一項曾經使用，均不會再獲發新券；如需再次查看電子現金券，以相同的三項資料再次提交即可。提交即表示你同意 LongbridgeAI 收集以上資料作是次活動用途。</p>
+      <p class="contact-err" id="contactErr" hidden>請輸入電郵地址或手機號碼（最少一項）</p>
+      <p class="consent">每位用戶只可領取一張：用戶 ID、電郵地址或手機號碼任何一項曾經使用，均不會再獲發新券；如需再次查看電子現金券，以相同的用戶 ID 及領取時所用的電郵或手機號碼再次提交即可。提交即表示你同意 LongbridgeAI 收集以上資料作是次活動用途。</p>
       <button class="btn btn-primary" id="submit" type="submit">領取電子現金券</button>
       <div class="notice" id="notice" role="status" hidden></div>
     </form>
@@ -258,7 +261,8 @@
 
   const ERRORS = {
     SOLD_OUT: '電子現金券已經全部派完，多謝支持！',
-    ALREADY_CLAIMED: '你輸入的用戶 ID、電郵地址或手機號碼已領取過電子現金券，每位用戶只限一張。如要重新顯示，請輸入領取時所用的三項資料。',
+    ALREADY_CLAIMED: '你輸入的用戶 ID、電郵地址或手機號碼已領取過電子現金券，每位用戶只限一張。如要重新顯示，請輸入領取時所用的用戶 ID 及電郵或手機號碼。',
+    NEED_CONTACT: '請輸入電郵地址或手機號碼（最少一項）。',
     INVALID_USER_ID: '用戶 ID 只可包含數字，請檢查後再試。',
     INVALID_EMAIL: '請輸入有效的電郵地址。',
     INVALID_PHONE: '請輸入有效的手機號碼。',
@@ -297,7 +301,8 @@
     $('vCode').textContent = code.replace(/(\d{4})(?=\d)/g, '$1 ');
     $('vDemo').hidden = !v.demoText;
     $('vExpiry').textContent = v.expiry ? '有效日期至 Expiring on ' + v.expiry : '';
-    $('vMeta').textContent = [v.email ? maskEmail(v.email) : '', v.claimedAt ? '領取時間 ' + v.claimedAt : ''].filter(Boolean).join(' · ');
+    const who = v.email ? maskEmail(v.email) : (v.phone ? v.phone.slice(0, -4).replace(/\d/g, '*') + v.phone.slice(-4) : '');
+    $('vMeta').textContent = [who, v.claimedAt ? '領取時間 ' + v.claimedAt : ''].filter(Boolean).join(' · ');
     $('vMeta').hidden = !$('vMeta').textContent;
     $('formView').hidden = true;
     $('voucherView').hidden = false;
@@ -315,13 +320,21 @@
     const cc = $('cc').value;
     const num = $('phone').value.replace(/\D/g, '');
     const okUser = /^\d{4,20}$/.test(userId);
-    const okEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    const okPhone = (cc === '+852' || cc === '+853') ? num.length === 8 : num.length >= 6 && num.length <= 13;
+    // 電郵、電話二選一：冇填唔算錯，填咗就要格式啱
+    const okEmail = !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    const okPhone = !num || ((cc === '+852' || cc === '+853') ? num.length === 8 : num.length >= 6 && num.length <= 13);
+    const hasContact = !!email || !!num;
     $('fUser').classList.toggle('invalid', !okUser);
     $('fEmail').classList.toggle('invalid', !okEmail);
     $('fPhone').classList.toggle('invalid', !okPhone);
-    return okUser && okEmail && okPhone ? { userId, email, phone: cc + num, event: URL_EVENT, bee: URL_BEE } : null;
+    $('contactErr').hidden = hasContact;
+    if (!(okUser && okEmail && okPhone && hasContact)) return null;
+    const payload = { userId, event: URL_EVENT, bee: URL_BEE };
+    if (email) payload.email = email;
+    if (num) payload.phone = cc + num;
+    return payload;
   }
+
 
   async function claim(payload) {
     if (DEMO) {
@@ -343,7 +356,7 @@
     try {
       const r = await claim(payload);
       if (r.ok) {
-        const saved = { code: r.code, demoText: r.demoText, expiry: r.expiry, email: payload.email, claimedAt: r.claimedAt };
+        const saved = { code: r.code, demoText: r.demoText, expiry: r.expiry, email: payload.email, phone: payload.phone, claimedAt: r.claimedAt };
         try { localStorage.setItem(STORE_KEY, JSON.stringify(saved)); } catch (_) {}
         showVoucher(saved);
       } else {
